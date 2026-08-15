@@ -2,8 +2,9 @@
 import React, { useState, useMemo } from 'react';
 import * as math from 'mathjs';
 import { solveAdvancedMath } from '../services/geminiService';
+import { solveEquationLocal } from '../utils/localSolvers';
 import { MathResult, ModelType, ApiKeys } from '../types';
-import { Loader2, Variable, ChevronRight, Hash, Sparkles, Keyboard, RotateCcw } from 'lucide-react';
+import { Loader2, Variable, ChevronRight, Hash, Sparkles, Keyboard, RotateCcw, ShieldCheck, Globe } from 'lucide-react';
 import MathKeypad from './MathKeypad';
 import ComplexPlane from './ComplexPlane';
 
@@ -37,11 +38,19 @@ const EquationEngine: React.FC<EquationEngineProps> = ({ model = ModelType.GEMIN
     if (!query.trim()) return;
     setLoading(true);
     try {
+      // 优先本地引擎：解析二次/数值求根/线性方程组
+      const localRes = solveEquationLocal(query);
+      if (localRes) {
+        setResult({ ...localRes, method: 'local' });
+        setLoading(false);
+        return;
+      }
+
       const category = mode === 'Algebraic' ? '代数方程' : '线性方程组';
       const res = await solveAdvancedMath(query, category, model, apiKeys);
-      setResult(res);
+      setResult({ ...res, method: 'ai' });
     } catch (e) {
-      setResult({ value: "无法求解", explanation: "请确保方程格式正确。示例: x^2 - 4 = 0" });
+      setResult({ value: "无法求解", explanation: "请确保方程格式正确。示例: x^2 - 4 = 0", method: 'ai' });
     }
     setLoading(false);
   };
@@ -94,7 +103,12 @@ const EquationEngine: React.FC<EquationEngineProps> = ({ model = ModelType.GEMIN
                  <Hash className="w-24 h-24" />
                </div>
                <div className="relative z-10">
-                 <div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-2">解析结果 (Solution)</div>
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">解析结果 (Solution)</div>
+                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 ${result.method === 'local' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-500'}`}>
+                     {result.method === 'local' ? <><ShieldCheck className="w-3 h-3" /> 离线引擎</> : <><Globe className="w-3 h-3" /> 云端推理</>}
+                   </span>
+                 </div>
                  <div className="text-3xl font-black text-slate-900 math-font mb-4">
                    {result.value}
                  </div>

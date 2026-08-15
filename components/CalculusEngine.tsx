@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import * as math from 'mathjs';
 import { solveAdvancedMath } from '../services/geminiService';
 import { localSymbolicSolve } from '../utils/mathUtils';
+import { numericLimit, numericIntegral, symbolicIntegral } from '../utils/localSolvers';
 import { MathResult, ModelType, ApiKeys } from '../types';
 import { Loader2, BrainCircuit, ShieldCheck, Globe, Keyboard } from 'lucide-react';
 import MathKeypad from './MathKeypad';
@@ -28,17 +29,67 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
     return null;
   }, [result]);
 
-  const handleSolve = async () => {
-    setLoading(true);
-    const localRes = localSymbolicSolve(query);
-    // 仅当本地符号引擎真正求出了符号解（非普通求值）时使用本地结果
-    if (localRes && localRes.method === 'local' && localRes.explanation !== "Evaluated locally.") {
-      setResult({
-        value: localRes.value,
-        explanation: "已通过本地符号运算引擎求解。",
+  /** 尝试本地求解微积分问题（diff / integral / limit） */
+  const tryLocalCalculus = (): (MathResult & { method?: 'local' | 'ai' }) | null => {
+    const lower = query.toLowerCase().trim();
+
+    // 1. 符号求导（diff / derivative）
+    const der = localSymbolicSolve(query);
+    if (der && der.method === 'local' && der.explanation !== "Evaluated locally.") {
+      return {
+        value: der.value,
+        explanation: "已通过本地符号运算引擎求解（链式法则/乘积法则）。",
         steps: ["解析数学表达式", "应用符号求导法则（链式法则/乘积法则）", "化简并输出结果"],
         method: 'local'
-      });
+      };
+    }
+
+    // 2. 定积分 integral(f, x, a, b)
+    let m = lower.match(/^integral\s*\(\s*(.+?)\s*,\s*([a-z])\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/);
+    if (!m) m = lower.match(/^integrate\s*\(\s*(.+?)\s*,\s*([a-z])\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/);
+    if (!m) m = lower.match(/^int\s*\(\s*(.+?)\s*,\s*([a-z])\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/);
+    if (m) {
+      const [, fExpr, v, a, b] = m;
+      const res = numericIntegral(fExpr, v, Number(a), Number(b));
+      if (res) return res;
+    }
+
+    // 3. 不定积分 integral(f, x)
+    m = lower.match(/^integral\s*\(\s*(.+?)\s*,\s*([a-z])\s*\)$/);
+    if (!m) m = lower.match(/^integrate\s*\(\s*(.+?)\s*,\s*([a-z])\s*\)$/);
+    if (!m) m = lower.match(/^int\s*\(\s*(.+?)\s*,\s*([a-z])\s*\)$/);
+    if (m) {
+      const [, fExpr, v] = m;
+      const res = symbolicIntegral(fExpr, v);
+      if (res) return res;
+      // 符号积分失败 → 尝试数值定积分 [-10,10] 作为近似提示
+      const approx = numericIntegral(fExpr, v, -10, 10);
+      if (approx) {
+        return {
+          value: approx.value,
+          explanation: "该不定积分超出本地规则表，已给出 [-10, 10] 区间数值近似（如需精确解析式请使用云端推理）。",
+          steps: approx.steps,
+          method: 'local'
+        };
+      }
+    }
+
+    // 4. 极限 limit(f, x, a)
+    m = lower.match(/^limit\s*\(\s*(.+?)\s*,\s*([a-z])\s*,\s*(-?[\d.]+)\s*\)$/);
+    if (m) {
+      const [, fExpr, v, a] = m;
+      const res = numericLimit(fExpr, v, Number(a));
+      if (res) return res;
+    }
+
+    return null;
+  };
+
+  const handleSolve = async () => {
+    setLoading(true);
+    const localRes = tryLocalCalculus();
+    if (localRes) {
+      setResult(localRes);
       setLoading(false);
       return;
     }

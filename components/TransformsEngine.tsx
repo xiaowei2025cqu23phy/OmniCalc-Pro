@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { solveAdvancedMath } from '../services/geminiService';
+import { solveTransformLocal } from '../utils/localSolvers';
 import { MathResult, ModelType, ApiKeys } from '../types';
-import { Loader2, Zap, Beaker, FileText, Globe, Keyboard } from 'lucide-react';
+import { Loader2, Zap, Beaker, FileText, Globe, Keyboard, ShieldCheck } from 'lucide-react';
 import MathKeypad from './MathKeypad';
 
 const EXAMPLES = [
@@ -28,9 +29,15 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
   const handleSolve = async () => {
     setLoading(true);
     try {
+      // 优先本地变换查表（常见函数对），识别失败才调用 AI
+      const localRes = solveTransformLocal(query, type);
+      if (localRes) {
+        setResult({ ...localRes, method: 'local' });
+        return;
+      }
       const fullQuery = `求函数在 ${type} 域下的积分变换： ${query}`;
       const res = await solveAdvancedMath(fullQuery, `积分变换 (${type})`, model, apiKeys);
-      setResult(res);
+      setResult({ ...res, method: 'ai' });
     } catch (e) {
       setResult({ value: "错误", explanation: "变换失败，请检查网络或密钥配置。", method: 'ai' });
     } finally {
@@ -75,7 +82,7 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
         </div>
 
         <div className="p-4 mb-6 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-          <b>注意:</b> 积分变换涉及复杂的符号积分运算，将由 AI 引擎进行推理。
+          <b>提示:</b> 常见函数对将优先由<b>本地变换表</b>离线求解（无需网络）；仅未收录的复杂函数才会调用 AI 推理。
           请输入关于时间项 <span className="font-mono">t</span> 的函数，系统将变换至 <span className="font-mono">{type === 'Laplace' ? 's' : 'ω'}</span> 频域。
         </div>
 
@@ -131,7 +138,12 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
           <div className="mt-8 animate-in fade-in slide-in-from-top-4">
             <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100 mb-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">变换结果 (域函数)</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">变换结果 (域函数)</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 ${result.method === 'local' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-500'}`}>
+                    {result.method === 'local' ? <><ShieldCheck className="w-3 h-3" /> 本地变换表</> : <><Globe className="w-3 h-3" /> 云端推理</>}
+                  </span>
+                </div>
                 <FileText className="w-4 h-4 text-amber-400" />
               </div>
               <div className="text-2xl font-bold text-slate-900 math-font mb-2">
