@@ -69,6 +69,14 @@ OmniCalc Pro 是一款为科研、工程与数学教育量身定做的全功能�
 2. **API 密钥**: 若需启用 AI 功能，请在应用设置或 `.env` 中配置 `GEMINI_API_KEY`。
 3. **性能说明**: 3D 绘图采用基于 Canvas 的定点采样，大规模曲面时建议调整步长以获得极致流畅度。
 
+## 🌐 部署指南
+
+项目已配置**相对路径构建**（`base: './'`），构建产物可部署到任意子路径（如 GitHub Pages 项目页），不会再因绝对路径导致白屏。
+
+- **推荐（自动部署）**: 仓库已内置 GitHub Actions 工作流（`.github/workflows/deploy.yml`），在 GitHub 仓库 Settings → Pages → Source 选择 **"GitHub Actions"**，推送 `main` 分支即自动构建并发布。
+- **手动（分支部署）**: 本地执行 `npm run build` 后将 `dist/` 目录内容部署到托管分支（如 `gh-pages`）即可。
+- **本地验证**: `npm run dev` 启动开发服务器；`npm run preview` 预览构建产物。
+
 ## 🔐 密钥与安全须知
 
 - **运行时密钥**: 通过应用内「API 设置」录入的密钥仅保存在浏览器 `localStorage`，不会离开您的设备。

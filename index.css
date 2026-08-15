@@ -1,4 +1,9 @@
-/* OmniCalc Pro 全局样式补充 */
+/* OmniCalc Pro 全局样式 */
+
+/* Tailwind 本地化：替代 CDN script，构建产物完全自包含（支持离线部署） */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* 自定义滚动条 */
 .custom-scrollbar::-webkit-scrollbar {
