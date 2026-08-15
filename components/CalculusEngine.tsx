@@ -31,7 +31,8 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
   const handleSolve = async () => {
     setLoading(true);
     const localRes = localSymbolicSolve(query);
-    if (localRes && localRes.explanation !== "Evaluated locally.") {
+    // 仅当本地符号引擎真正求出了符号解（非普通求值）时使用本地结果
+    if (localRes && localRes.method === 'local' && localRes.explanation !== "Evaluated locally.") {
       setResult({
         value: localRes.value,
         explanation: "已通过本地符号运算引擎求解。",
@@ -46,7 +47,7 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
       const res = await solveAdvancedMath(query, '微积分与微分方程', model, apiKeys);
       setResult({ ...res, method: 'ai' });
     } catch (e) {
-      setResult({ value: "错误", explanation: "计算失败，请检查网络连接或表达式语法。", steps: [] });
+      setResult({ value: "错误", explanation: "计算失败，请检查网络连接或表达式语法。", steps: [], method: 'ai' });
     }
     setLoading(false);
   };

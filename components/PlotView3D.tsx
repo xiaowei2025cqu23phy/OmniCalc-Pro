@@ -41,26 +41,38 @@ const PlotView3D: React.FC<PlotView3DProps> = ({
     const h = canvas.height;
     
     let points: any[] = [];
+    // 记录各轴实际范围，用于动态归一化，避免硬编码 /10 导致视图错乱
+    let xMin = -10, xMax = 10, yMin = -10, yMax = 10, zMin = -10, zMax = 10;
     if (mode === '3D 曲面图') {
       points = generatePlotData2D(threeDExpr, range, range, res);
+      xMin = range[0]; xMax = range[1];
+      yMin = range[0]; yMax = range[1];
     } else if (mode === '参数方程(3D)') {
       points = generateParametricData3D(parametric3DExprs[0], parametric3DExprs[1], parametric3DExprs[2], tRange, res);
     } else if (mode === '球坐标(3D)') {
       points = generateSphericalData(sphericalExpr, thetaRange, phiRange, res);
     }
 
+    // 计算参数/球坐标的实际坐标范围（曲面图已由 range 给定），过滤 NaN
+    if (mode !== '3D 曲面图' && points.length > 0) {
+      const finite = (key: 'x' | 'y' | 'z') => points.map(p => p[key]).filter(v => isFinite(v));
+      if (finite('x').length) { xMin = Math.min(...finite('x')); xMax = Math.max(...finite('x')); }
+      if (finite('y').length) { yMin = Math.min(...finite('y')); yMax = Math.max(...finite('y')); }
+      if (finite('z').length) { zMin = Math.min(...finite('z')); zMax = Math.max(...finite('z')); }
+    }
+    // 防止退化（范围为 0）导致除零
+    const safeSpan = (lo: number, hi: number) => (hi - lo) === 0 ? 1 : (hi - lo);
+    const spanX = safeSpan(xMin, xMax);
+    const spanY = safeSpan(yMin, yMax);
+    const spanZ = safeSpan(zMin, zMax);
+
     ctx.clearRect(0, 0, w, h);
 
     const project = (x: number, y: number, z: number) => {
-      let nx = (x - range[0]) / (range[1] - range[0]) * 2 - 1;
-      let ny = (y - range[0]) / (range[1] - range[0]) * 2 - 1;
-      let nz = isNaN(z) || !isFinite(z) ? 0 : z / 5;
-
-      if (mode === '参数方程(3D)' || mode === '球坐标(3D)') {
-        nx = x / 10;
-        ny = y / 10;
-        nz = z / 10;
-      }
+      // 归一化到 [-1, 1]，再统一缩放
+      const nx = ((x - xMin) / spanX) * 2 - 1;
+      const ny = ((y - yMin) / spanY) * 2 - 1;
+      const nz = isNaN(z) || !isFinite(z) ? 0 : ((z - zMin) / spanZ) * 2 - 1;
 
       const ax = (rotY - 90) * Math.PI / 180;
       const ay = rotX * Math.PI / 180;
@@ -102,9 +114,9 @@ const PlotView3D: React.FC<PlotView3DProps> = ({
       ctx.fillText(label, end.px + 5, end.py + 5);
     };
 
-    drawAxis(10, 0, 0, '#ef4444', 'X');
-    drawAxis(0, 10, 0, '#10b981', 'Y');
-    drawAxis(0, 0, 10, '#3b82f6', 'Z');
+    drawAxis(xMax, 0, 0, '#ef4444', 'X');
+    drawAxis(0, yMax, 0, '#10b981', 'Y');
+    drawAxis(0, 0, zMax, '#3b82f6', 'Z');
 
     const projectedPoints = points.map(p => ({
       ...p,
@@ -127,6 +139,8 @@ const PlotView3D: React.FC<PlotView3DProps> = ({
           const p4 = projectedPoints[idx4];
 
           if (!p1 || !p2 || !p3 || !p4) continue;
+          // 跳过含 NaN 的退化单元，避免出现飞到原点的乱码多边形
+          if ([p1.z, p2.z, p3.z, p4.z].some(v => isNaN(v) || !isFinite(v))) continue;
 
           const avgZDepth = (p1.proj.zDepth + p2.proj.zDepth + p3.proj.zDepth + p4.proj.zDepth) / 4;
           const avgZValue = (p1.z + p2.z + p3.z + p4.z) / 4;
@@ -139,7 +153,14 @@ const PlotView3D: React.FC<PlotView3DProps> = ({
         }
       }
 
+      // 按深度排序：远的先画（zDepth 越大越远，取决于投影方向，此处保持原逻辑）
       polygons.sort((a, b) => b.zDepth - a.zDepth);
+
+      // 计算 z 值范围用于颜色归一化，避免硬编码 [-5,5] 范围
+      const zValues = polygons.map(p => p.zValue);
+      const zLo = zValues.length ? Math.min(...zValues) : -1;
+      const zHi = zValues.length ? Math.max(...zValues) : 1;
+      const zSpan = (zHi - zLo) === 0 ? 1 : (zHi - zLo);
 
       polygons.forEach(poly => {
         ctx.beginPath();
@@ -149,12 +170,14 @@ const PlotView3D: React.FC<PlotView3DProps> = ({
         });
         ctx.closePath();
 
-        const hue = 200 - (poly.zValue + 5) * 20; 
-        const lightness = Math.max(30, Math.min(80, 50 + poly.zDepth * 10));
+        // 归一化 z 到 [0,1]，映射色相：低值=蓝(240)，高值=红(0)
+        const norm = (poly.zValue - zLo) / zSpan;
+        const hue = 240 - norm * 240;
+        const lightness = Math.max(35, Math.min(75, 50 + poly.zDepth * 8));
         
-        ctx.fillStyle = `hsla(${hue}, 70%, ${lightness}%, 0.85)`;
+        ctx.fillStyle = `hsla(${hue}, 75%, ${lightness}%, 0.88)`;
         ctx.fill();
-        ctx.strokeStyle = `hsla(${hue}, 70%, 40%, 0.3)`;
+        ctx.strokeStyle = `hsla(${hue}, 75%, 40%, 0.35)`;
         ctx.lineWidth = 0.5;
         ctx.stroke();
       });

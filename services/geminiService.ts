@@ -72,7 +72,14 @@ export const solveAdvancedMath = async (
       });
       
       if (!response.text) throw new Error("AI 返回了空响应");
-      return JSON.parse(response.text) as MathResult;
+      try {
+        return JSON.parse(response.text) as MathResult;
+      } catch (e) {
+        // AI 偶尔返回带 markdown 包裹的 JSON，尝试提取
+        const match = response.text.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]) as MathResult;
+        throw new SyntaxError("AI 返回了非标准格式的数据");
+      }
     } else if (model === ModelType.DEEPSEEK) {
       const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
       const apiKey = userKeys?.deepseek || process.env.DEEPSEEK_API_KEY;
@@ -97,10 +104,20 @@ export const solveAdvancedMath = async (
       
       if (response.status === 401) throw new Error("401: DeepSeek 密钥无效");
       if (response.status === 429) throw new Error("429: DeepSeek 配额不足");
-      if (!response.ok) throw new Error(`DeepSeek API 请求失败 (HTTP ${response.status})`);
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        throw new Error(`DeepSeek API 请求失败 (HTTP ${response.status}): ${errBody.slice(0, 200)}`);
+      }
       
       const data = await response.json();
-      return JSON.parse(data.choices[0].message.content) as MathResult;
+      const content = data.choices?.[0]?.message?.content || "";
+      try {
+        return JSON.parse(content) as MathResult;
+      } catch (e) {
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]) as MathResult;
+        throw new SyntaxError("DeepSeek 返回了非标准格式的数据");
+      }
     } else if (model === ModelType.QWEN) {
       const QWEN_API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
       const apiKey = userKeys?.qwen || process.env.QWEN_API_KEY;
@@ -118,17 +135,26 @@ export const solveAdvancedMath = async (
             { role: "system", content: systemPrompt },
             { role: "user", content: query }
           ],
-          response_format: { type: "json_object" },
           temperature: 0.3
         })
       });
       
       if (response.status === 401) throw new Error("401: Qwen 密钥无效");
       if (response.status === 429) throw new Error("429: Qwen 配额不足");
-      if (!response.ok) throw new Error(`Qwen API 请求失败 (HTTP ${response.status})`);
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        throw new Error(`Qwen API 请求失败 (HTTP ${response.status}): ${errBody.slice(0, 200)}`);
+      }
       
       const data = await response.json();
-      return JSON.parse(data.choices[0].message.content) as MathResult;
+      const content = data.choices?.[0]?.message?.content || "";
+      try {
+        return JSON.parse(content) as MathResult;
+      } catch (e) {
+        const match = content.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]) as MathResult;
+        throw new SyntaxError("Qwen 返回了非标准格式的数据");
+      }
     }
     throw new Error("不支持的模型类型");
   } catch (e: any) {

@@ -4,7 +4,7 @@ import {
   generatePlotData1D, generateParametricData, generatePolarData,
   generateImplicitData
 } from '../utils/mathUtils';
-import { AreaChart, Plus, Trash2, Keyboard, RotateCw, Move, Box } from 'lucide-react';
+import { AreaChart, Plus, Trash2, Keyboard, RotateCw, Move } from 'lucide-react';
 import MathKeypad from './MathKeypad';
 import PlotView2D from './PlotView2D';
 import PlotView3D from './PlotView3D';
@@ -39,7 +39,6 @@ const PlottingEngine: React.FC = () => {
   const [implicitSeries, setImplicitSeries] = useState<{points: any[], name: string, color: string}[]>([]);
   const [showKeypad, setShowKeypad] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

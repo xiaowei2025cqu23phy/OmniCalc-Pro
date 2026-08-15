@@ -6,13 +6,16 @@ import * as math from 'mathjs';
  */
 export const localSymbolicSolve = (expr: string) => {
   try {
-    // 处理形如 diff(sin(x), x) 的本地求导
-    if (expr.toLowerCase().startsWith('diff(') || expr.toLowerCase().startsWith('derivative(')) {
-      // 提取内部表达式，例如 diff(x^2, x) -> x^2
-      const match = expr.match(/\(([^,]+),?\s*([^)]+)?\)/);
-      if (match) {
-        const target = match[1].trim();
-        const variable = match[2]?.trim() || 'x';
+    const lower = expr.toLowerCase();
+    // 处理形如 diff(sin(x), x) / derivative(expr, var) 的本地求导
+    if (lower.startsWith('diff(') || lower.startsWith('derivative(')) {
+      const fnName = lower.startsWith('derivative(') ? 'derivative' : 'diff';
+      const inner = expr.slice(fnName.length + 1, expr.lastIndexOf(')'));
+      // 用括号配平的方式切分顶层逗号，避免嵌套括号被误切
+      const parts = splitTopLevelArgs(inner);
+      if (parts.length >= 1) {
+        const target = parts[0].trim();
+        const variable = (parts[1] || 'x').trim();
         const result = math.derivative(target, variable);
         return {
           value: result.toString(),
@@ -32,6 +35,28 @@ export const localSymbolicSolve = (expr: string) => {
   } catch (err) {
     return null; // 如果本地无法处理，返回null触发AI备选
   }
+};
+
+/**
+ * 按顶层逗号切分参数，忽略嵌套括号/引号内的逗号。
+ * 例如 "sin(x), x" -> ["sin(x)", " x"]
+ */
+const splitTopLevelArgs = (s: string): string[] => {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of s) {
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim() !== '' || parts.length > 0) parts.push(current);
+  return parts;
 };
 
 // Fix: Use MathJS functional abs and arg as they are safer for types than methods on the Complex object
@@ -145,20 +170,25 @@ export const generateSphericalData = (exprR: string, rangeTheta: [number, number
     const stepTheta = (rangeTheta[1] - rangeTheta[0]) / resolution;
     const stepPhi = (rangePhi[1] - rangePhi[0]) / resolution;
 
+    // 保留完整 (resolution+1)×(resolution+1) 网格，NaN 占位，避免 3D 多边形索引错位
     for (let i = 0; i <= resolution; i++) {
       const theta = rangeTheta[0] + i * stepTheta;
       for (let j = 0; j <= resolution; j++) {
         const phi = rangePhi[0] + j * stepPhi;
         try {
           const r = compiled.evaluate({ theta, phi });
-          if (typeof r === 'number' && !isNaN(r)) {
+          if (typeof r === 'number' && !isNaN(r) && isFinite(r)) {
             // Spherical to Cartesian: x = r sin(phi) cos(theta), y = r sin(phi) sin(theta), z = r cos(phi)
             const x = r * Math.sin(phi) * Math.cos(theta);
             const y = r * Math.sin(phi) * Math.sin(theta);
             const z = r * Math.cos(phi);
             data.push({ x, y, z, r, theta, phi });
+          } else {
+            data.push({ x: NaN, y: NaN, z: NaN, r: NaN, theta, phi });
           }
-        } catch (e) {}
+        } catch (e) {
+          data.push({ x: NaN, y: NaN, z: NaN, r: NaN, theta, phi });
+        }
       }
     }
   } catch (e) {}
@@ -172,14 +202,19 @@ export const generatePlotData2D = (expr: string, rangeX: [number, number], range
     const stepX = (rangeX[1] - rangeX[0]) / resolution;
     const stepY = (rangeY[1] - rangeY[0]) / resolution;
 
+    // 注意：必须保留完整的 (resolution+1)×(resolution+1) 网格结构，
+    // 即便某点求值失败也要占位（用 NaN），否则 3D 曲面多边形索引会错位。
     for (let i = 0; i <= resolution; i++) {
       const x = rangeX[0] + i * stepX;
       for (let j = 0; j <= resolution; j++) {
         const y = rangeY[0] + j * stepY;
         try {
           const z = compiled.evaluate({ x, y });
-          data.push({ x, y, z });
-        } catch (e) {}
+          // 保留数值；非数值（如复数结果）用 NaN 占位以维持网格
+          data.push({ x, y, z: typeof z === 'number' ? z : NaN });
+        } catch (e) {
+          data.push({ x, y, z: NaN });
+        }
       }
     }
   } catch (e) {
@@ -210,6 +245,9 @@ export const generateImplicitData = (expr: string, rangeX: [number, number], ran
           const v = compiled.evaluate({ x, y });
           const vRight = compiled.evaluate({ x: x + stepX, y });
           const vTop = compiled.evaluate({ x, y: y + stepY });
+
+          // 跳过 NaN/Infinity，避免 Math.sign(NaN) 误判产生伪点
+          if (!isFinite(v) || !isFinite(vRight) || !isFinite(vTop)) continue;
 
           // Check if there is a crossing between current point and right/top neighbors
           if (Math.sign(v) !== Math.sign(vRight) || Math.sign(v) !== Math.sign(vTop)) {

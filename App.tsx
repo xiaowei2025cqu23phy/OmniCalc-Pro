@@ -26,8 +26,7 @@ import {
   Variable,
   Hash,
   Sparkles,
-  Cpu,
-  Key
+  Cpu
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -35,8 +34,12 @@ const App: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<ModelType>(ModelType.GEMINI);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKeys>(() => {
-    const saved = localStorage.getItem('omnicalc_api_keys');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('omnicalc_api_keys');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
   });
 
   const handleSaveKeys = (keys: ApiKeys) => {
@@ -183,7 +186,11 @@ const App: React.FC = () => {
             >
               <Settings className="w-4 h-4" /> API 设置
             </button>
-            <button className="flex items-center gap-2 px-5 py-3 bg-white rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all shadow-sm hover:shadow-md">
+            <button 
+              onClick={() => setActiveTool(ToolType.PHYSICS_REF)}
+              className="flex items-center gap-2 px-5 py-3 bg-white rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all shadow-sm hover:shadow-md"
+              title="查看公式与常数手册"
+            >
               <Info className="w-4 h-4" /> 帮助说明
             </button>
             <a 

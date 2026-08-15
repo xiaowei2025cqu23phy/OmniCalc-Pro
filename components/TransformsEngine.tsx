@@ -27,10 +27,15 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
 
   const handleSolve = async () => {
     setLoading(true);
-    const fullQuery = `求函数在 ${type} 域下的积分变换： ${query}`;
-    const res = await solveAdvancedMath(fullQuery, `积分变换 (${type})`, model, apiKeys);
-    setResult(res);
-    setLoading(false);
+    try {
+      const fullQuery = `求函数在 ${type} 域下的积分变换： ${query}`;
+      const res = await solveAdvancedMath(fullQuery, `积分变换 (${type})`, model, apiKeys);
+      setResult(res);
+    } catch (e) {
+      setResult({ value: "错误", explanation: "变换失败，请检查网络或密钥配置。", method: 'ai' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInsert = (val: string) => setQuery(prev => prev + val);

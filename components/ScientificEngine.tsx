@@ -21,7 +21,17 @@ const ScientificEngine: React.FC = () => {
     try {
       // Basic mathjs evaluation for scientific calculator
       const res = math.evaluate(expression);
-      const resStr = typeof res === 'number' ? res.toLocaleString() : res.toString();
+      // 对大整数避免 toLocaleString 丢失精度：仅在安全整数范围内本地化
+      let resStr: string;
+      if (typeof res === 'number') {
+        if (Number.isInteger(res) && Math.abs(res) > 1e15) {
+          resStr = res.toExponential(6);
+        } else {
+          resStr = res.toLocaleString(undefined, { maximumFractionDigits: 12 });
+        }
+      } else {
+        resStr = res.toString();
+      }
       
       const newResult: MathResult = {
         value: resStr,

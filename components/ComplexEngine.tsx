@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import * as math from 'mathjs';
 import { parseAndEvaluate } from '../utils/mathUtils';
 import { Keyboard, RefreshCw } from 'lucide-react';
 import MathKeypad from './MathKeypad';

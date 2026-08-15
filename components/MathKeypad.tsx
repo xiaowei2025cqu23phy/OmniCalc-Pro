@@ -60,9 +60,9 @@ const MathKeypad: React.FC<KeypadProps> = ({ onInsert, onClear, onDelete, onConf
         <button onClick={() => onInsert('1/(')} className={funcClass}>1/x</button>
         <button onClick={() => onInsert('^2')} className={funcClass}>x²</button>
         <button onClick={() => onInsert('^3')} className={funcClass}>x³</button>
-        <button onClick={() => onInsert('( / )')} className={funcClass}>分式</button>
-        <button onClick={() => onInsert('^( ')} className={funcClass}>xⁿ</button>
-        <button onClick={() => onInsert('sqrt( ')} className={funcClass}>√x</button>
+        <button onClick={() => onInsert('(/)')} className={funcClass}>分式</button>
+        <button onClick={() => onInsert('^(')} className={funcClass}>xⁿ</button>
+        <button onClick={() => onInsert('sqrt(')} className={funcClass}>√x</button>
       </div>
 
       {/* Dynamic Section based on Type */}

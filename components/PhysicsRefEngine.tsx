@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BookOpen, Copy, Info, Search, Terminal, Atom, Compass, Waves, Zap, FunctionSquare } from 'lucide-react';
+import { BookOpen, Copy, Info, Search, Terminal, Atom, Compass, Zap, FunctionSquare } from 'lucide-react';
 
 interface RefItem {
   title: string;
@@ -42,6 +42,19 @@ const INTEGRALS: RefItem[] = [
 const PhysicsRefEngine: React.FC = () => {
   const [tab, setTab] = useState<'vector' | 'constants' | 'special' | 'integrals'>('vector');
   const [search, setSearch] = useState('');
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const handleExportAll = () => {
+    const current = tab === 'vector' ? VECTOR_DATA
+      : tab === 'constants' ? CONSTANTS
+      : tab === 'special' ? SPECIAL_FUNCS
+      : INTEGRALS;
+    const text = current.map(i => `${i.title}\n${i.formula}\n${i.desc}\n应用: ${i.context}\n`).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1800);
+    });
+  };
 
   const renderGrid = (items: RefItem[]) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -134,8 +147,12 @@ const PhysicsRefEngine: React.FC = () => {
               物理常数是宇宙的语言。在计算中点击右上角的 <Copy className="w-3 h-3 inline" /> 即可将精确数值复制到剪贴板，直接粘贴到运算模块中使用。
             </p>
           </div>
-          <button className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-500 transition-colors whitespace-nowrap shadow-lg shadow-indigo-500/20">
-            获取专业 PDF 手册
+          <button 
+            onClick={handleExportAll}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-500 transition-colors whitespace-nowrap shadow-lg shadow-indigo-500/20 flex items-center gap-2"
+          >
+            <Copy className="w-4 h-4" />
+            {copiedAll ? "已复制到剪贴板" : "导出本类公式"}
           </button>
         </div>
       </div>
