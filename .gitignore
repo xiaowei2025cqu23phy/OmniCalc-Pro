@@ -19,6 +19,10 @@ dist-ssr
 .npm-cache/
 .npm-cache*/
 
+# 本地测试临时产物（禁止提交）
+.*.mjs
+.plot-test.mjs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
