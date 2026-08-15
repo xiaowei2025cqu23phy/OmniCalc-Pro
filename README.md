@@ -73,8 +73,9 @@ OmniCalc Pro 是一款为科研、工程与数学教育量身定做的全功能�
 
 项目已配置**相对路径构建**（`base: './'`），构建产物可部署到任意子路径（如 GitHub Pages 项目页），不会再因绝对路径导致白屏。
 
-- **推荐（自动部署）**: 仓库已内置 GitHub Actions 工作流（`.github/workflows/deploy.yml`），在 GitHub 仓库 Settings → Pages → Source 选择 **"GitHub Actions"**，推送 `main` 分支即自动构建并发布。
-- **手动（分支部署）**: 本地执行 `npm run build` 后将 `dist/` 目录内容部署到托管分支（如 `gh-pages`）即可。
+- **推荐（一键分支部署）**: 本地执行 `npm run deploy`，自动完成构建并将 `dist/` 产物推送到 `gh-pages` 分支。首次使用请在 GitHub 仓库 Settings → Pages → Source 选择 **"Deploy from a branch" → Branch: `gh-pages` / (root)**。
+- **自动部署（Actions）**: 仓库已内置 GitHub Actions 工作流（`.github/workflows/deploy.yml`），Settings → Pages → Source 选择 **"GitHub Actions"**，推送 `main` 分支即自动构建发布。
+- **手动**: 本地执行 `npm run build` 后将 `dist/` 目录内容部署到托管分支（如 `gh-pages`）即可。
 - **本地验证**: `npm run dev` 启动开发服务器；`npm run preview` 预览构建产物。
 
 ## 🔐 密钥与安全须知
