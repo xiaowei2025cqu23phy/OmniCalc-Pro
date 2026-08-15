@@ -18,14 +18,15 @@ interface PlotView2DProps {
   onMouseUp: () => void;
   onWheel: (e: React.WheelEvent) => void;
   chartContainerRef: React.RefObject<HTMLDivElement>;
-  exprs: string[];
+  /** 仅显式（y=f(x)）表达式列表，与 generatePlotData1D 的 val_${index} 索引严格对应 */
+  explicitExprs: string[];
   COLORS: string[];
 }
 
 const PlotView2D: React.FC<PlotView2DProps> = ({
   mode, plotData, implicitSeries, range, viewY, isDragging,
   onMouseDown, onMouseMove, onMouseUp, onWheel, chartContainerRef,
-  exprs, COLORS
+  explicitExprs, COLORS
 }) => {
   return (
     <div 
@@ -67,28 +68,21 @@ const PlotView2D: React.FC<PlotView2DProps> = ({
           
           {mode === '直角坐标' ? (
             <>
-              {/* Explicit Lines */}
-              {exprs.map((expr, index) => {
-                 const normalized = expr.replace(/\s/g, '');
-                 const isImplicit = (normalized.includes('y') && !normalized.startsWith('y=')) || 
-                                    (normalized.includes('=') && !normalized.startsWith('y='));
-                 if (isImplicit) return null;
-                 
-                 return (
-                  <Line 
-                    key={index}
-                    name={expr || `函数${index+1}`}
-                    type="monotone" 
-                    dataKey={`val_${index}`} 
-                    stroke={COLORS[index % COLORS.length]} 
-                    strokeWidth={3} 
-                    dot={false} 
-                    connectNulls
-                    animationDuration={0}
-                    isAnimationActive={false}
-                  />
-                 );
-              })}
+              {/* 显式曲线：索引与 plotData 的 val_${index} 严格一致 */}
+              {explicitExprs.map((expr, index) => (
+                <Line 
+                  key={index}
+                  name={expr || `函数${index+1}`}
+                  type="monotone" 
+                  dataKey={`val_${index}`} 
+                  stroke={COLORS[index % COLORS.length]} 
+                  strokeWidth={3} 
+                  dot={false} 
+                  connectNulls
+                  animationDuration={0}
+                  isAnimationActive={false}
+                />
+              ))}
               {/* Implicit Scatter Points */}
               {implicitSeries.map((series, index) => (
                 <Scatter

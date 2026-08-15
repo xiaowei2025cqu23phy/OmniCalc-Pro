@@ -13,6 +13,48 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 
 type PlotMode = '直角坐标' | '参数方程(2D)' | '参数方程(3D)' | '极坐标(2D)' | '球坐标(3D)' | '3D 曲面图';
 
+/** 示例模板库：fields 按各模式字段数定义（直角坐标=多条显式曲线，参数2D/3D=分量，其余=单表达式） */
+interface PlotTemplate {
+  name: string;
+  desc: string;
+  fields: string[];
+}
+const TEMPLATES: Record<PlotMode, PlotTemplate[]> = {
+  '直角坐标': [
+    { name: '三角对比', desc: 'sin(x) / cos(x) / sin(2x) 三曲线同绘', fields: ['sin(x)', 'cos(x)', 'sin(2*x)'] },
+    { name: '多项式族', desc: 'x² / x³ / x⁴ 对比增长', fields: ['x^2', 'x^3', 'x^4'] },
+    { name: '指数与对数', desc: 'exp(x) / ln(x) / log10(x)', fields: ['exp(x)', 'ln(x)', 'log10(x)'] },
+    { name: '双曲函数', desc: 'sinh(x) / cosh(x) / tanh(x)', fields: ['sinh(x)', 'cosh(x)', 'tanh(x)'] },
+    { name: '圆（隐式）', desc: 'x² + y² = 25', fields: ['x^2 + y^2 = 25'] },
+    { name: '笛卡尔叶线（隐式）', desc: 'x³ + y³ = 3xy', fields: ['x^3 + y^3 = 3*x*y'] },
+  ],
+  '3D 曲面图': [
+    { name: '高斯钟', desc: 'z = exp(-(x²+y²))', fields: ['exp(-(x^2+y^2))'] },
+    { name: '鞍面', desc: 'z = x² - y²', fields: ['x^2 - y^2'] },
+    { name: '波纹面', desc: 'z = sin(x)·cos(y)', fields: ['sin(x)*cos(y)'] },
+    { name: '涟漪', desc: 'z = sin(√(x²+y²))', fields: ['sin(sqrt(x^2+y^2))'] },
+  ],
+  '参数方程(2D)': [
+    { name: '圆', desc: 'x=3cos(t), y=3sin(t)', fields: ['cos(t)*3', 'sin(t)*3'] },
+    { name: '利萨如曲线', desc: 'x=sin(3t), y=sin(5t)', fields: ['sin(3*t)', 'sin(5*t)'] },
+    { name: '阿基米德螺线', desc: 'x=t·cos(t)/4, y=t·sin(t)/4', fields: ['cos(t)*t/4', 'sin(t)*t/4'] },
+  ],
+  '参数方程(3D)': [
+    { name: '螺旋线', desc: 'x=5cos(t), y=5sin(t), z=t/2', fields: ['cos(t)*5', 'sin(t)*5', 't/2'] },
+    { name: '环面结', desc: '经典 (2,3) 环面结', fields: ['cos(3*t)*(2+cos(2*t))', 'sin(3*t)*(2+cos(2*t))', 'sin(2*t)'] },
+  ],
+  '极坐标(2D)': [
+    { name: '心形线', desc: 'r = 2(1-cos θ)', fields: ['2 * (1 - cos(theta))'] },
+    { name: '五叶玫瑰', desc: 'r = sin(5θ)', fields: ['sin(5*theta)'] },
+    { name: '对数螺线', desc: 'r = e^(θ/8)', fields: ['exp(theta/8)'] },
+  ],
+  '球坐标(3D)': [
+    { name: '球面', desc: 'r = 5', fields: ['5'] },
+    { name: '旋转体', desc: 'r = 5(1+cos θ)', fields: ['5*(1+cos(theta))'] },
+    { name: '花式曲面', desc: 'r = 5(1+0.2sin(8θ)cos(8φ))', fields: ['5 * (1 + 0.2 * sin(8 * theta) * cos(8 * phi))'] },
+  ],
+};
+
 const PlottingEngine: React.FC = () => {
   const [mode, setMode] = useState<PlotMode>('直角坐标');
   const [exprs, setExprs] = useState<string[]>(['exp(x)', 'x^2 + y^2 = 25', 'sin(x)']);
@@ -33,46 +75,79 @@ const PlottingEngine: React.FC = () => {
   const [rotY, setRotY] = useState(30);
   const [zoom3D, setZoom3D] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
 
   const [plotData, setPlotData] = useState<any[]>([]);
   const [implicitSeries, setImplicitSeries] = useState<{points: any[], name: string, color: string}[]>([]);
+  // 与 plotData 索引严格对应的显式曲线列表（供 PlotView2D 渲染）
+  const [explicitExprs, setExplicitExprs] = useState<string[]>([]);
   const [showKeypad, setShowKeypad] = useState(false);
+  const [inputMode, setInputMode] = useState<'edit' | 'templates'>('edit');
   const [activeIndex, setActiveIndex] = useState(0);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (mode === '直角坐标') {
-      const explicitExprs: string[] = [];
-      const implicitExprs: string[] = [];
+      const explicitList: string[] = [];
+      const implicitList: string[] = [];
       
       exprs.forEach(expr => {
         const normalized = expr.replace(/\s/g, '');
+        if (!normalized) return; // 跳过空表达式
         const isActuallyImplicit = (normalized.includes('y') && !normalized.startsWith('y=')) || 
                                    (normalized.includes('=') && !normalized.startsWith('y='));
         
         if (isActuallyImplicit) {
-          implicitExprs.push(expr);
+          implicitList.push(expr);
         } else {
-          explicitExprs.push(normalized.startsWith('y=') ? expr.split('=')[1] : expr);
+          explicitList.push(normalized.startsWith('y=') ? expr.split('=')[1] : expr);
         }
       });
 
-      setPlotData(generatePlotData1D(explicitExprs, range));
+      setExplicitExprs(explicitList);
+      setPlotData(generatePlotData1D(explicitList, range));
       
-      const implicitData = implicitExprs.map((expr, i) => ({
+      const implicitData = implicitList.map((expr, i) => ({
         points: generateImplicitData(expr, range, viewY, 150),
         name: expr,
-        color: COLORS[(explicitExprs.length + i) % COLORS.length]
+        color: COLORS[(explicitList.length + i) % COLORS.length]
       }));
       setImplicitSeries(implicitData);
       
     } else if (mode === '参数方程(2D)') {
+      setExplicitExprs([]);
+      setImplicitSeries([]);
       setPlotData(generateParametricData(parametricExprs[0], parametricExprs[1], tRange));
     } else if (mode === '极坐标(2D)') {
+      setExplicitExprs([]);
+      setImplicitSeries([]);
       setPlotData(generatePolarData(polarExpr, thetaRange));
+    } else {
+      // 3D 模式：数据由 PlotView3D 自行生成，此处无需处理
+      setExplicitExprs([]);
+      setImplicitSeries([]);
+      setPlotData([]);
     }
-  }, [exprs, threeDExpr, parametricExprs, parametric3DExprs, polarExpr, sphericalExpr, mode, range, viewY, tRange, thetaRange, phiRange, rotX, rotY, zoom3D]);
+    // 注意：不依赖 rotX/rotY/zoom3D 与 3D 表达式（3D 渲染由 PlotView3D 独立处理），避免无谓重算
+  }, [exprs, mode, range, viewY, tRange, thetaRange, phiRange, parametricExprs, polarExpr]);
+
+  /** 应用示例模板：按当前模式填入对应字段 */
+  const applyTemplate = (t: PlotTemplate) => {
+    if (mode === '直角坐标') {
+      setExprs([...t.fields]);
+    } else if (mode === '参数方程(2D)') {
+      setParametricExprs([t.fields[0] || '', t.fields[1] || '']);
+    } else if (mode === '参数方程(3D)') {
+      setParametric3DExprs([t.fields[0] || '', t.fields[1] || '', t.fields[2] || '']);
+    } else if (mode === '极坐标(2D)') {
+      setPolarExpr(t.fields[0] || '');
+    } else if (mode === '球坐标(3D)') {
+      setSphericalExpr(t.fields[0] || '');
+    } else if (mode === '3D 曲面图') {
+      setThreeDExpr(t.fields[0] || '');
+    }
+  };
 
   const handleInsert = (val: string) => {
     if (mode === '直角坐标') {
@@ -98,26 +173,31 @@ const PlottingEngine: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
-    setLastMousePos({ x: e.clientX, y: e.clientY });
+    lastMousePosRef.current = { x: e.clientX, y: e.clientY };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    const dx = e.clientX - lastMousePos.x;
-    const dy = e.clientY - lastMousePos.y;
-    
-    if (mode === '3D 曲面图' || mode === '参数方程(3D)' || mode === '球坐标(3D)') {
-      setRotX(prev => (prev + dx * 0.5) % 360);
-      setRotY(prev => Math.max(0, Math.min(90, prev + dy * 0.5)));
-    } else {
-      const scaleX = (range[1] - range[0]) / (chartContainerRef.current?.clientWidth || 600);
-      const scaleY = (viewY[1] - viewY[0]) / (chartContainerRef.current?.clientHeight || 450);
+    // rAF 节流：拖动时每帧最多更新一次，避免高频 setState 导致图表重算卡顿
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const prev = lastMousePosRef.current;
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
       
-      setRange(prev => [prev[0] - dx * scaleX, prev[1] - dx * scaleX]);
-      setViewY(prev => [prev[0] + dy * scaleY, prev[1] + dy * scaleY]);
-    }
-    
-    setLastMousePos({ x: e.clientX, y: e.clientY });
+      if (mode === '3D 曲面图' || mode === '参数方程(3D)' || mode === '球坐标(3D)') {
+        setRotX(r => (r + dx * 0.5 + 360) % 360);
+        setRotY(r => Math.max(0, Math.min(90, r + dy * 0.5)));
+      } else {
+        const scaleX = (range[1] - range[0]) / (chartContainerRef.current?.clientWidth || 600);
+        const scaleY = (viewY[1] - viewY[0]) / (chartContainerRef.current?.clientHeight || 450);
+        
+        setRange(r => [r[0] - dx * scaleX, r[1] - dx * scaleX]);
+        setViewY(r => [r[0] + dy * scaleY, r[1] + dy * scaleY]);
+      }
+    });
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -144,6 +224,10 @@ const PlottingEngine: React.FC = () => {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
   };
 
   return (
@@ -175,41 +259,45 @@ const PlottingEngine: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           <div className="lg:col-span-2 space-y-4">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">数学表达式输入</label>
-            
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {(mode === '直角坐标' ? ['exp(x)', 'log(x)', 'x^2+y^2=25', 'y^2=x^3-x', 'x^3+y^3=3*x*y', 'y^2=x^2*(x+1)', 'abs(x)+abs(y)=5', 'sin(x)+cos(y)=0', '(x^2+y^2-1)^3-x^2*y^3=0'] : 
-                  mode === '3D 曲面图' ? ['exp(-(x^2+y^2))', 'x*y', 'sin(x)*cos(y)', 'x^2-y^2'] :
-                  mode === '极坐标(2D)' ? ['2 * (1 - cos(theta))', 'sin(5*theta)', 'theta/3', 'exp(theta/10)', 'cos(3*theta)'] :
-                  mode === '球坐标(3D)' ? ['5', '5*(1+cos(theta))', '5*sin(theta)*cos(phi)', '2+sin(4*theta)'] :
-                  mode === '参数方程(2D)' ? ['cos(t)*t', 'sin(t)*t'] :
-                  ['cos(3*t)*(2+cos(2*t))', 'sin(3*t)*(2+cos(2*t))', 'sin(2*t)', '5*(1+cos(t))', '5*sin(t)', '10*sin(t/2)', 'cos(t)*5', 'sin(t)*5', 't/2']
-                ).map(f => (
-                  <button 
-                    key={f}
-                    onClick={() => {
-                      if (mode === '直角坐标') {
-                        const n = [...exprs];
-                        n[activeIndex] = f;
-                        setExprs(n);
-                      } else if (mode === '3D 曲面图') setThreeDExpr(f);
-                      else if (mode === '极坐标(2D)') setPolarExpr(f);
-                      else if (mode === '球坐标(3D)') setSphericalExpr(f);
-                      else if (mode === '参数方程(3D)') {
-                        // Special handling for preset triplets if we wanted, but for now just single field
-                        const n = [...parametric3DExprs];
-                        n[activeIndex] = f;
-                        setParametric3DExprs(n as [string, string, string]);
-                      }
-                    }}
-                    className="px-2.5 py-1 bg-emerald-50 text-[10px] font-bold text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all"
+            <div className="flex items-center justify-between gap-3">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">数学表达式输入</label>
+              {/* 输入方式选择：手动编辑 / 示例模板 */}
+              <div className="flex bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+                <button
+                  onClick={() => setInputMode('edit')}
+                  className={`px-3 py-1 rounded-md transition-all ${inputMode === 'edit' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  ✏️ 手动编辑
+                </button>
+                <button
+                  onClick={() => setInputMode('templates')}
+                  className={`px-3 py-1 rounded-md transition-all ${inputMode === 'templates' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  📋 模板库
+                </button>
+              </div>
+            </div>
+
+            {inputMode === 'templates' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {TEMPLATES[mode].map(t => (
+                  <button
+                    key={t.name}
+                    onClick={() => applyTemplate(t)}
+                    className="text-left p-4 bg-white border border-emerald-100 rounded-2xl hover:border-emerald-300 hover:shadow-md transition-all group"
+                    title={`点击应用：${t.fields.join(', ')}`}
                   >
-                    {f}
+                    <div className="font-bold text-xs text-emerald-700 mb-1 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      {t.name}
+                    </div>
+                    <div className="text-[10px] text-slate-500 leading-relaxed">{t.desc}</div>
+                    <div className="mt-2 text-[10px] font-mono text-slate-400 truncate">{t.fields.join(', ')}</div>
                   </button>
                 ))}
               </div>
-
+            ) : (
+            <div className="space-y-3">
               {mode === '直角坐标' && exprs.map((expr, index) => (
                 <div key={index} className="flex flex-col gap-2 group animate-in slide-in-from-left-2">
                   <div className="flex items-center gap-2">
@@ -401,8 +489,9 @@ const PlottingEngine: React.FC = () => {
                 </button>
               )}
             </div>
+            )}
 
-            {showKeypad && (
+            {inputMode === 'edit' && showKeypad && (
               <div className="pt-2 animate-in zoom-in-95">
                 <MathKeypad 
                   onInsert={handleInsert}
@@ -548,7 +637,7 @@ const PlottingEngine: React.FC = () => {
               onMouseUp={handleMouseUp}
               onWheel={handleWheel}
               chartContainerRef={chartContainerRef}
-              exprs={exprs}
+              explicitExprs={explicitExprs}
               COLORS={COLORS}
             />
           )}

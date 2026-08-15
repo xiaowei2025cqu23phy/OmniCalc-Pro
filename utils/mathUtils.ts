@@ -72,22 +72,25 @@ export const generatePlotData1D = (expressions: string[], range: [number, number
   const step = (max - min) / steps;
   const data = [];
   
+  // 保留 null 占位（不收缩索引），确保 val_${index} 与传入列表索引严格对应，
+  // 否则与渲染端 (PlotView2D) 的 dataKey 错位会导致曲线消失/错乱
   const compiledExprs = expressions.map(expr => {
     try {
       return { expr, compiled: math.compile(expr) };
     } catch (e) {
       return null;
     }
-  }).filter(item => item !== null);
+  });
 
   for (let x = min; x <= max; x += step) {
     const point: any = { x };
     let hasValue = false;
     
     compiledExprs.forEach((item, index) => {
+      if (!item) return;
       try {
         const y = item.compiled.evaluate({ x });
-        if (typeof y === 'number' && !isNaN(y)) {
+        if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
           point[`val_${index}`] = y;
           hasValue = true;
         }
