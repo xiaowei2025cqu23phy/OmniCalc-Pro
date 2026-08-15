@@ -34,12 +34,13 @@ const EquationEngine: React.FC<EquationEngineProps> = ({ model = ModelType.GEMIN
     return null;
   }, [result]);
 
-  const handleSolve = async () => {
-    if (!query.trim()) return;
+  const handleSolve = async (override?: string) => {
+    const q = (typeof override === 'string' && override.trim() ? override : query).trim();
+    if (!q) return;
     setLoading(true);
     try {
       // 优先本地引擎：解析二次/数值求根/线性方程组
-      const localRes = solveEquationLocal(query);
+      const localRes = solveEquationLocal(q);
       if (localRes) {
         setResult({ ...localRes, method: 'local' });
         setLoading(false);
@@ -47,7 +48,7 @@ const EquationEngine: React.FC<EquationEngineProps> = ({ model = ModelType.GEMIN
       }
 
       const category = mode === 'Algebraic' ? '代数方程' : '线性方程组';
-      const res = await solveAdvancedMath(query, category, model, apiKeys);
+      const res = await solveAdvancedMath(q, category, model, apiKeys);
       setResult({ ...res, method: 'ai' });
     } catch (e) {
       setResult({ value: "无法求解", explanation: "请确保方程格式正确。示例: x^2 - 4 = 0", method: 'ai' });
@@ -152,25 +153,29 @@ const EquationEngine: React.FC<EquationEngineProps> = ({ model = ModelType.GEMIN
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 hover:shadow-md transition-all cursor-pointer" onClick={() => { setMode('Algebraic'); setQuery('x^2 - 5x + 6 = 0'); }}>
-          <h4 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
-            <Variable className="w-4 h-4" /> 代数方程示例
-          </h4>
-          <ul className="text-xs text-indigo-700 space-y-1 opacity-80">
-            <li>• 二次方程: x² - 5x + 6 = 0</li>
-            <li>• 复数方程: x² + 1 = 0</li>
-            <li>• 复系数方程: x + 2i = 5</li>
-          </ul>
-        </div>
-        <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 hover:shadow-md transition-all cursor-pointer" onClick={() => { setMode('LinearSystems'); setQuery('x + y = 10, x - y = 2'); }}>
-          <h4 className="text-sm font-bold text-emerald-900 mb-2 flex items-center gap-2">
-            <ChevronRight className="w-4 h-4" /> 线性方程组示例
-          </h4>
-          <ul className="text-xs text-emerald-700 space-y-1 opacity-80">
-            <li>• 二元一次: x + y = 10, x - y = 2</li>
-            <li>• 三元一次系统求解</li>
-          </ul>
+      <div>
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">示例（点击即算）</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[
+            { title: '二次方程', expr: 'x^2 - 5x + 6 = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '复数根', expr: 'x^2 + 1 = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '三次方程', expr: 'x^3 - 6x^2 + 11x - 6 = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '四次方程', expr: 'x^4 - 10x^2 + 9 = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '超越方程', expr: 'e^x - 2 = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '混合方程', expr: 'x^2 + sin(x) = 0', mode: 'Algebraic' as SolverMode, color: 'bg-rose-50 border-rose-100 hover:bg-rose-100', text: 'text-rose-600' },
+            { title: '二元一次组', expr: 'x + y = 10, x - y = 2', mode: 'LinearSystems' as SolverMode, color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+            { title: '二元组-分数解', expr: '3x + 4y = 10, 2x - y = 3', mode: 'LinearSystems' as SolverMode, color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+            { title: '三元一次组', expr: 'x + y + z = 6, 2x - y + z = 3, x + 2y - z = 2', mode: 'LinearSystems' as SolverMode, color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+          ].map(ex => (
+            <div
+              key={ex.expr}
+              className={`p-4 ${ex.color} rounded-2xl border cursor-pointer transition-colors`}
+              onClick={() => { setMode(ex.mode); setQuery(ex.expr); setResult(null); handleSolve(ex.expr); }}
+            >
+              <div className={`text-[10px] font-bold ${ex.text} uppercase mb-1`}>{ex.title}</div>
+              <div className="text-[11px] font-mono text-slate-600 break-all">{ex.expr}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

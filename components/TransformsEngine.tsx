@@ -7,11 +7,25 @@ import { Loader2, Zap, Beaker, FileText, Globe, Keyboard, ShieldCheck } from 'lu
 import MathKeypad from './MathKeypad';
 
 const EXAMPLES = [
-  { label: '指数衰减', expr: 'f(t) = e^(-at) * u(t)', type: 'Laplace' },
   { label: '单位阶跃', expr: 'f(t) = u(t)', type: 'Laplace' },
-  { label: '正弦信号', expr: 'f(t) = sin(w*t)', type: 'Fourier' },
+  { label: '狄拉克冲激', expr: 'f(t) = delta(t)', type: 'Laplace' },
+  { label: '常数信号', expr: 'f(t) = 5', type: 'Laplace' },
+  { label: '指数衰减', expr: 'f(t) = e^(-2t)', type: 'Laplace' },
+  { label: '指数×阶跃', expr: 'f(t) = e^(-at) * u(t)', type: 'Laplace' },
+  { label: '线性斜坡', expr: 'f(t) = t', type: 'Laplace' },
+  { label: '二次斜坡', expr: 'f(t) = t^2', type: 'Laplace' },
+  { label: '正弦信号', expr: 'f(t) = sin(3t)', type: 'Laplace' },
+  { label: '余弦信号', expr: 'f(t) = cos(2t)', type: 'Laplace' },
+  { label: '双曲正弦', expr: 'f(t) = sinh(2t)', type: 'Laplace' },
+  { label: '衰减正弦', expr: 'f(t) = e^(-2t)*sin(3t)', type: 'Laplace' },
+  { label: '衰减余弦', expr: 'f(t) = e^(-2t)*cos(3t)', type: 'Laplace' },
+  { label: 't·指数', expr: 'f(t) = t*e^(-2t)', type: 'Laplace' },
+  { label: '狄拉克冲激', expr: 'f(t) = delta(t)', type: 'Fourier' },
+  { label: '常数信号', expr: 'f(t) = 1', type: 'Fourier' },
+  { label: '单位阶跃', expr: 'f(t) = u(t)', type: 'Fourier' },
+  { label: '双边指数', expr: 'f(t) = e^(-a*|t|)', type: 'Fourier' },
   { label: '高斯脉冲', expr: 'f(t) = e^(-a*t^2)', type: 'Fourier' },
-  { label: '狄拉克冲激', expr: 'f(t) = delta(t)', type: 'Laplace' }
+  { label: '矩形窗', expr: 'f(t) = rect(t/2)', type: 'Fourier' },
 ];
 
 interface TransformsEngineProps {
@@ -26,16 +40,18 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
   const [showKeypad, setShowKeypad] = useState(true);
   const [result, setResult] = useState<MathResult | null>(null);
 
-  const handleSolve = async () => {
+  const handleSolve = async (override?: string) => {
+    const q = (typeof override === 'string' && override.trim() ? override : query).trim();
+    if (!q) return;
     setLoading(true);
     try {
       // 优先本地变换查表（常见函数对），识别失败才调用 AI
-      const localRes = solveTransformLocal(query, type);
+      const localRes = solveTransformLocal(q, type);
       if (localRes) {
         setResult({ ...localRes, method: 'local' });
         return;
       }
-      const fullQuery = `求函数在 ${type} 域下的积分变换： ${query}`;
+      const fullQuery = `求函数在 ${type} 域下的积分变换： ${q}`;
       const res = await solveAdvancedMath(fullQuery, `积分变换 (${type})`, model, apiKeys);
       setResult({ ...res, method: 'ai' });
     } catch (e) {
@@ -92,7 +108,7 @@ const TransformsEngine: React.FC<TransformsEngineProps> = ({ model = ModelType.G
             {EXAMPLES.filter(ex => ex.type === type).map((ex, i) => (
               <button
                 key={i}
-                onClick={() => { setQuery(ex.expr); setType(ex.type as any); }}
+                onClick={() => { setQuery(ex.expr); setType(ex.type as any); handleSolve(ex.expr); }}
                 className="px-3 py-1.5 bg-slate-50 hover:bg-amber-50 border border-slate-100 hover:border-amber-200 rounded-full text-xs text-slate-600 transition-colors"
               >
                 {ex.label}

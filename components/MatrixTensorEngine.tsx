@@ -114,11 +114,12 @@ const MatrixTensorEngine: React.FC = () => {
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState<'array' | 'latex' | null>(null);
 
-  const compute = () => {
+  const compute = (override?: string) => {
+    const op = typeof override === 'string' && override.trim() ? override : operation;
     try {
       const A = math.evaluate(matrixA);
       const B = math.evaluate(matrixB);
-      const res = math.evaluate(operation, { A, B });
+      const res = math.evaluate(op, { A, B });
       setResult(res);
     } catch (e: any) {
       setResult('错误: ' + e.message);
@@ -335,10 +336,18 @@ const MatrixTensorEngine: React.FC = () => {
       </div>
 
       <div className="bg-slate-100 p-4 rounded-xl">
-        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">常用运算符速览</h4>
+        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">常用运算符速览（点击即算）</h4>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {['inv(A)', 'det(A)', 'transpose(A)', 'eigs(A)', 'trace(A)', 'pinv(A)', 'norm(A)'].map(tag => (
+            <span key={tag} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-600 cursor-pointer hover:border-orange-300 hover:bg-orange-50" onClick={() => { setOperation(tag); compute(tag); }}>
+              {tag}
+            </span>
+          ))}
+        </div>
+        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">示例运算（点击即算）</h4>
         <div className="flex flex-wrap gap-2">
-          {['inv(A)', 'det(A)', 'transpose(A)', 'eigs(A)', 'trace(A)', 'cross(A, B)', 'dot(A, B)', 'pinv(A)', 'norm(A)'].map(tag => (
-            <span key={tag} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-600 cursor-pointer hover:border-orange-300" onClick={() => setOperation(tag)}>
+          {['A * B', 'A^2', 'det(A * B)', 'inv(A) * B', 'transpose(A) + B', 'cross([1,2,3], [4,5,6])', 'dot([1,2,3], [4,5,6])'].map(tag => (
+            <span key={tag} className="px-2 py-1 bg-orange-50 border border-orange-100 rounded text-xs font-mono text-orange-600 cursor-pointer hover:border-orange-300 hover:bg-orange-100" onClick={() => { setOperation(tag); compute(tag); }}>
               {tag}
             </span>
           ))}

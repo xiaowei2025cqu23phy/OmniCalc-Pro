@@ -30,11 +30,11 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
   }, [result]);
 
   /** 尝试本地求解微积分问题（diff / integral / limit） */
-  const tryLocalCalculus = (): (MathResult & { method?: 'local' | 'ai' }) | null => {
-    const lower = query.toLowerCase().trim();
+  const tryLocalCalculus = (input: string): (MathResult & { method?: 'local' | 'ai' }) | null => {
+    const lower = input.toLowerCase().trim();
 
     // 1. 符号求导（diff / derivative）
-    const der = localSymbolicSolve(query);
+    const der = localSymbolicSolve(input);
     if (der && der.method === 'local' && der.explanation !== "Evaluated locally.") {
       return {
         value: der.value,
@@ -85,9 +85,11 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
     return null;
   };
 
-  const handleSolve = async () => {
+  const handleSolve = async (override?: string) => {
+    const q = (typeof override === 'string' && override.trim() ? override : query).trim();
+    if (!q) return;
     setLoading(true);
-    const localRes = tryLocalCalculus();
+    const localRes = tryLocalCalculus(q);
     if (localRes) {
       setResult(localRes);
       setLoading(false);
@@ -95,7 +97,7 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
     }
 
     try {
-      const res = await solveAdvancedMath(query, '微积分与微分方程', model, apiKeys);
+      const res = await solveAdvancedMath(q, '微积分与微分方程', model, apiKeys);
       setResult({ ...res, method: 'ai' });
     } catch (e) {
       setResult({ value: "错误", explanation: "计算失败，请检查网络连接或表达式语法。", steps: [], method: 'ai' });
@@ -194,18 +196,32 @@ const CalculusEngine: React.FC<CalculusEngineProps> = ({ model = ModelType.GEMIN
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => setQuery("diff(exp(i*x), x)")}>
-          <div className="text-[10px] font-bold text-blue-600 uppercase mb-1">复数指数求导</div>
-          <div className="text-xs font-mono">diff(exp(i*x), x)</div>
-        </div>
-        <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition-colors" onClick={() => setQuery("diff(sin(i*x), x)")}>
-          <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">虚数参数三角函数</div>
-          <div className="text-xs font-mono">diff(sin(i*x), x)</div>
-        </div>
-        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => setQuery("integral(1/(x^2+1), x)")}>
-          <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">标准积分</div>
-          <div className="text-xs font-mono">integral(1/(x^2+1), x)</div>
+      <div>
+        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">示例（点击即算）</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {[
+            { title: '乘积求导', expr: 'diff(sin(x) * x^2, x)', color: 'bg-blue-50 border-blue-100 hover:bg-blue-100', text: 'text-blue-600' },
+            { title: '复合求导', expr: 'diff(exp(2*x), x)', color: 'bg-blue-50 border-blue-100 hover:bg-blue-100', text: 'text-blue-600' },
+            { title: '链式求导', expr: 'diff(sin(x)^2, x)', color: 'bg-blue-50 border-blue-100 hover:bg-blue-100', text: 'text-blue-600' },
+            { title: '多项式积分', expr: 'integral(x^3 + 2*x, x)', color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+            { title: '三角积分', expr: 'integral(sin(2*x), x)', color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+            { title: '指数积分', expr: 'integral(exp(x), x)', color: 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100', text: 'text-emerald-600' },
+            { title: '定积分', expr: 'integral(sin(x), x, 0, pi)', color: 'bg-teal-50 border-teal-100 hover:bg-teal-100', text: 'text-teal-600' },
+            { title: '定积分-抛物面', expr: 'integral(x^2, x, 0, 2)', color: 'bg-teal-50 border-teal-100 hover:bg-teal-100', text: 'text-teal-600' },
+            { title: '数值极限', expr: 'limit(sin(x)/x, x, 0)', color: 'bg-amber-50 border-amber-100 hover:bg-amber-100', text: 'text-amber-600' },
+            { title: '极限-有理式', expr: 'limit((x^2-1)/(x-1), x, 1)', color: 'bg-amber-50 border-amber-100 hover:bg-amber-100', text: 'text-amber-600' },
+            { title: '复数指数求导', expr: 'diff(exp(i*x), x)', color: 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100', text: 'text-indigo-600' },
+            { title: '虚数参数三角', expr: 'diff(sin(i*x), x)', color: 'bg-indigo-50 border-indigo-100 hover:bg-indigo-100', text: 'text-indigo-600' },
+          ].map(ex => (
+            <div
+              key={ex.expr}
+              className={`p-4 ${ex.color} rounded-2xl border cursor-pointer transition-colors`}
+              onClick={() => { setQuery(ex.expr); handleSolve(ex.expr); }}
+            >
+              <div className={`text-[10px] font-bold ${ex.text} uppercase mb-1`}>{ex.title}</div>
+              <div className="text-[11px] font-mono text-slate-600 break-all">{ex.expr}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

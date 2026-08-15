@@ -11,8 +11,10 @@ const ComplexEngine: React.FC = () => {
   const [result, setResult] = useState<any>(null);
   const [showKeypad, setShowKeypad] = useState(true);
 
-  const calculate = () => {
-    const res = parseAndEvaluate(input);
+  const calculate = (override?: string) => {
+    const src = typeof override === 'string' && override.trim() ? override : input;
+    if (override) setInput(override);
+    const res = parseAndEvaluate(src);
     setResult(res);
   };
 
@@ -63,12 +65,41 @@ const ComplexEngine: React.FC = () => {
 
           {!showKeypad && (
             <button
-              onClick={calculate}
+              onClick={() => calculate()}
               className="w-full py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors shadow-lg shadow-purple-100"
             >
               分析并计算
             </button>
           )}
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-slate-100">
+          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">示例（点击即算）</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: '基本形式', expr: '3 + 4i' },
+              { label: '欧拉公式', expr: 'exp(i * pi) + 1' },
+              { label: '复数乘法', expr: '(1 + 2i) * (3 - i)' },
+              { label: '复数除法', expr: '(3 + 4i) / (1 - 2i)' },
+              { label: '六次幂', expr: '(1 + i)^6' },
+              { label: '共轭', expr: 'conj(2 + 3i)' },
+              { label: '模长', expr: 'abs(3 - 4i)' },
+              { label: '极坐标', expr: '5 * exp(i * pi/4)' },
+              { label: '开方', expr: 'sqrt(-4)' },
+              { label: '对数', expr: 'log(1 + i)' },
+              { label: '正弦', expr: 'sin(2 + i)' },
+              { label: '单位圆点', expr: 'exp(i * pi/3)' },
+            ].map(ex => (
+              <button
+                key={ex.expr}
+                onClick={() => calculate(ex.expr)}
+                className="px-3 py-1.5 bg-purple-50 border border-purple-100 rounded-full text-xs font-bold text-purple-700 hover:bg-purple-100 transition-colors"
+                title={ex.expr}
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {result && (

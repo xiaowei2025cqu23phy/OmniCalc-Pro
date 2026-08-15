@@ -14,13 +14,15 @@ const ScientificEngine: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const calculate = () => {
-    if (!expression.trim()) return;
+  const calculate = (override?: string) => {
+    const src = typeof override === 'string' && override.trim() ? override : expression;
+    if (override && typeof override === 'string') setExpression(override);
+    if (!src.trim()) return;
     setLoading(true);
     
     try {
       // Basic mathjs evaluation for scientific calculator
-      const res = math.evaluate(expression);
+      const res = math.evaluate(src);
       // 对大整数避免 toLocaleString 丢失精度：仅在安全整数范围内本地化
       let resStr: string;
       if (typeof res === 'number') {
@@ -41,7 +43,7 @@ const ScientificEngine: React.FC = () => {
       
       setResult(newResult);
       setHistory(prev => [{ 
-        expr: expression, 
+        expr: src, 
         res: resStr, 
         timestamp: new Date() 
       }, ...prev].slice(0, 10));
@@ -101,6 +103,36 @@ const ScientificEngine: React.FC = () => {
                   className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-xl font-mono focus:border-indigo-400 focus:bg-white outline-none transition-all shadow-inner"
                   onKeyDown={(e) => e.key === 'Enter' && calculate()}
                 />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: '角度正弦', expr: 'sin(45 deg)' },
+                  { label: '弧度余弦', expr: 'cos(pi/3)' },
+                  { label: '勾股', expr: 'sqrt(2) + pi' },
+                  { label: '阶乘', expr: '5! + 2^10' },
+                  { label: '常用对数', expr: 'log10(1000)' },
+                  { label: '自然对数', expr: 'log(e^2)' },
+                  { label: '绝对值', expr: 'abs(-7.5)' },
+                  { label: '幂', expr: '2^0.5 * 8' },
+                  { label: '最大公约数', expr: 'gcd(12, 18)' },
+                  { label: '最小公倍数', expr: 'lcm(4, 6)' },
+                  { label: '组合数', expr: 'combinations(5, 2)' },
+                  { label: '排列数', expr: 'permutations(5, 3)' },
+                  { label: '欧拉恒等式', expr: 'e^(i*pi) + 1' },
+                  { label: '单位换算', expr: '5 km in miles' },
+                  { label: '物理力', expr: '2 kg * 9.81 m/s^2' },
+                  { label: '分数和', expr: '1/3 + 1/6' },
+                ].map(ex => (
+                  <button
+                    key={ex.expr}
+                    onClick={() => calculate(ex.expr)}
+                    className="px-2.5 py-1 bg-indigo-50/60 border border-indigo-100 rounded-full text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 transition-colors"
+                    title={ex.expr}
+                  >
+                    {ex.label}
+                  </button>
+                ))}
               </div>
 
               <MathKeypad 
